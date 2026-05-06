@@ -260,7 +260,7 @@ def generate_svg(center_id: str, entities: dict, relations: list, ring_assignmen
             lines.append(
                 f'  <text x="{x:.1f}" y="{y + radius + 14:.1f}" '
                 f'text-anchor="middle" fill="#e0e0e0" '
-                f'font-family="system-ui, sans-serif" font-size="{FONT_SIZE}"">{display_name}</text>'
+                f'font-family="system-ui, sans-serif" font-size="{FONT_SIZE}">{display_name}</text>'
             )
 
             # Type badge (small, below name)
