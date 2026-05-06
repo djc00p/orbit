@@ -114,11 +114,18 @@ export ORBIT_GRAPH="$HOME/projects/my-project/graph.jsonl"
 ont list
 ```
 
-### 4. Visualize (coming soon)
+### 4. Visualize
 
 ```bash
-python3 scripts/orbit_viz.py --center proj_myapp --output orbit.svg
+# Generate radial SVG centered on any entity
+python3 scripts/orbit_viz.py --center proj_website --output orbit.svg
+
+# Visualize a person, concept, or learning
+python3 scripts/orbit_viz.py --center p_alice --output person.svg
+python3 scripts/orbit_viz.py --center concept_api-design --output concept.svg
 ```
+
+Open the SVG in any browser — no server needed.
 
 ## Installation
 
