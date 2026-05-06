@@ -162,6 +162,8 @@ ont() {
 
 ## Multi-Agent Setup
 
+> **Note:** If you use OpenClaw's built-in ontology skill, it stores data in `memory/ontology/graph.jsonl` (per-agent). The setup below is for **shared cross-agent memory** — a custom pattern that puts the graph in a central location both agents can access.
+
 The key insight: **agents coordinate via the graph, not messages.**
 
 ```text
@@ -268,6 +270,7 @@ Free. No database. No API keys. No server. Just JSONL.
 - [ ] Time-travel (graph at any point)
 - [ ] Auto-enrichment from transcripts
 - [ ] Python package (pip install orbit)
+- [ ] Shared-ontology skill for OpenClaw (migrate from custom setup to installable skill)
 
 ## License
 

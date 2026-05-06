@@ -10,7 +10,7 @@ This document is for AI agents (like you) who need to read from and write to the
 
 ## Directory Structure
 
-```
+```bash
 ~/orbit/
 ├── graph.jsonl              # The shared knowledge graph
 ├── scripts/
@@ -104,6 +104,7 @@ The other agent will pick it up on their next session by querying for their task
 ### When to Use Direct Messaging
 
 Use `sessions_send` only when:
+
 - Something is time-sensitive / urgent
 - The task can't wait for a heartbeat cycle
 - You need an immediate acknowledgment
@@ -115,7 +116,7 @@ Otherwise, use the graph.
 ### ID Naming
 
 | Type | Pattern | Example |
-|------|---------|---------|
+| ---- | ------- | ------- |
 | Project | `proj_<slug>` | `proj_website` |
 | Task | `task_<slug>` | `task_setup-ci` |
 | Learning | `learn_<slug>-<date>` | `learn_cors-preflight-20260506` |
@@ -128,6 +129,7 @@ Otherwise, use the graph.
 ### Dates in IDs
 
 Use Unix timestamp or YYYYMMDD suffix for learnings and tasks to avoid collisions:
+
 - `learn_telegram-token-1777957326`
 - `learn_sdlc-inversion-20260506`
 
@@ -146,6 +148,7 @@ Use Unix timestamp or YYYYMMDD suffix for learnings and tasks to avoid collision
 ### Properties Schema
 
 Every entity should have at minimum:
+
 ```json
 {
   "name": "Human-readable name",
@@ -155,6 +158,7 @@ Every entity should have at minimum:
 ```
 
 Optional fields:
+
 - `"repo"` — GitHub URL for projects
 - `"local_path"` — Local directory path
 - `"assignee"` — Who owns this task
@@ -164,11 +168,13 @@ Optional fields:
 ## Multi-Agent Specific Rules
 
 1. **Always run dedup after bulk imports**
+
    ```bash
    python3 scripts/dedup_ontology.py
    ```
 
 2. **Check for existing entities before creating**
+
    ```bash
    ont get --id proj_example
    # If not found, then create
@@ -176,6 +182,7 @@ Optional fields:
 
 3. **Use CWD detection in scripts**
    Scripts that check hardcoded paths may hit the wrong workspace for other agents. Use `SCRIPT_DIR` + `CWD` pattern matching to determine the active workspace dynamically:
+
    ```python
    import os
    CWD = os.getcwd()
