@@ -5,12 +5,13 @@ Orbit View — Radial SVG generator for ontology graphs.
 Usage:
     python3 scripts/orbit_viz.py --center proj_website --output orbit.svg
     python3 scripts/orbit_viz.py --center concept_cognitive-load --output concept.svg
-    python3 scripts/orbit_viz.py --center p_alice --output person.svg
+    python3 scripts/orbit_viz.py --center p_alice --output person.svg --show-memory
 """
 
 import argparse
 import json
 import math
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -27,23 +28,25 @@ COLORS = {
     "MemoryChunk": "#B8B8B8",
 }
 
-# Ring configuration
+# Ring configuration: radius, label, max nodes, node radius
 RING_CONFIG = [
-    {"radius": 0, "label": "Center", "max_nodes": 1},
-    {"radius": 120, "label": "Direct", "max_nodes": 12},
-    {"radius": 240, "label": "Siblings", "max_nodes": 20},
-    {"radius": 360, "label": "Adjacency", "max_nodes": 30},
-    {"radius": 480, "label": "Loose", "max_nodes": 40},
+    {"radius": 0, "label": "Center", "max_nodes": 1, "node_radius": 36},
+    {"radius": 140, "label": "Direct", "max_nodes": 10, "node_radius": 26},
+    {"radius": 260, "label": "Siblings", "max_nodes": 16, "node_radius": 20},
+    {"radius": 380, "label": "Adjacency", "max_nodes": 22, "node_radius": 16},
+    {"radius": 480, "label": "Loose", "max_nodes": 28, "node_radius": 12},
 ]
 
-NODE_RADIUS = 28
 FONT_SIZE = 11
 CENTER_X = 500
 CENTER_Y = 500
 SVG_SIZE = 1000
 
+# Default output directory
+DEFAULT_OUTPUT_DIR = Path.home() / "Documents" / "Orbit-Viz"
 
-def load_graph(graph_path: Path):
+
+def load_graph(graph_path: Path, show_memory: bool = False):
     """Load entities and relations from graph.jsonl."""
     entities = {}
     relations = []
@@ -60,6 +63,8 @@ def load_graph(graph_path: Path):
                 op = json.loads(line)
                 if op.get("op") == "create" and "entity" in op:
                     e = op["entity"]
+                    if not show_memory and e.get("type") == "MemoryChunk":
+                        continue
                     entities[e["id"]] = e
                 elif op.get("op") == "relate":
                     relations.append(op)
@@ -83,12 +88,7 @@ def get_related_ids(entity_id: str, relations: list):
 def get_ring_entities(center_id: str, entities: dict, relations: list):
     """
     Assign entities to rings based on relationship distance from center.
-
-    Ring 0: Center entity
-    Ring 1: Direct relationships
-    Ring 2: Same type as center (siblings)
-    Ring 3: Related to ring 1 or 2 entities (adjacency)
-    Ring 4: Everything else connected in the graph (loose)
+    Caps each ring to max_nodes. Remaining entities are dropped.
     """
     center = entities.get(center_id)
     if not center:
@@ -96,31 +96,44 @@ def get_ring_entities(center_id: str, entities: dict, relations: list):
 
     center_type = center.get("type", "Unknown")
     assigned = {center_id: 0}
+    ring_counts = {i: 0 for i in range(len(RING_CONFIG))}
+    ring_counts[0] = 1
+
+    def try_assign(eid: str, ring: int) -> bool:
+        if eid in assigned or ring >= len(RING_CONFIG):
+            return False
+        config = RING_CONFIG[ring]
+        if ring_counts[ring] >= config["max_nodes"]:
+            return False
+        assigned[eid] = ring
+        ring_counts[ring] += 1
+        return True
 
     # Ring 1: Direct relationships
     direct = get_related_ids(center_id, relations)
     for eid in direct:
-        if eid in entities and eid not in assigned:
-            assigned[eid] = 1
+        if eid in entities:
+            try_assign(eid, 1)
 
     # Ring 2: Same type as center (siblings)
     for eid, e in entities.items():
         if eid == center_id:
             continue
-        if e.get("type") == center_type and eid not in assigned:
-            assigned[eid] = 2
+        if e.get("type") == center_type:
+            if eid not in assigned:
+                try_assign(eid, 2)
 
     # Ring 3: Related to ring 1 or 2 entities
     ring_1_2 = {eid for eid, ring in assigned.items() if ring in (1, 2)}
     for source_id in ring_1_2:
         for related_id in get_related_ids(source_id, relations):
             if related_id in entities and related_id not in assigned:
-                assigned[related_id] = 3
+                try_assign(related_id, 3)
 
-    # Ring 4: Everything else in the graph
+    # Ring 4: Everything else connected in the graph
     for eid in entities:
         if eid not in assigned:
-            assigned[eid] = 4
+            try_assign(eid, 4)
 
     return assigned
 
@@ -191,24 +204,34 @@ def generate_svg(center_id: str, entities: dict, relations: list, ring_assignmen
             f'fill="none" stroke="#2a2a4e" stroke-width="1" stroke-dasharray="4,4"/>'
         )
 
-    # Draw relationships as lines
+    # Draw relationships as lines — only if both ends are in positions
+    # Limit to avoid hairball: only show relations where one end is center or ring 1
     drawn_relations = set()
     for rel in relations:
         from_id = rel.get("from")
         to_id = rel.get("to")
-        if from_id in positions and to_id in positions:
-            # Avoid duplicate lines
-            key = tuple(sorted([from_id, to_id]))
-            if key in drawn_relations:
-                continue
-            drawn_relations.add(key)
+        if from_id not in positions or to_id not in positions:
+            continue
 
-            x1, y1 = positions[from_id]
-            x2, y2 = positions[to_id]
-            lines.append(
-                f'  <line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
-                f'stroke="#3a3a5e" stroke-width="0.5" opacity="0.4"/>'
-            )
+        # Skip duplicate lines
+        key = tuple(sorted([from_id, to_id]))
+        if key in drawn_relations:
+            continue
+        drawn_relations.add(key)
+
+        # Only draw lines that connect to center or ring 1 entities
+        # This avoids the hairball of ring 3-4 cross-connections
+        ring_from = ring_assignments.get(from_id, 5)
+        ring_to = ring_assignments.get(to_id, 5)
+        if ring_from > 1 and ring_to > 1:
+            continue
+
+        x1, y1 = positions[from_id]
+        x2, y2 = positions[to_id]
+        lines.append(
+            f'  <line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" '
+            f'stroke="#3a3a5e" stroke-width="0.5" opacity="0.4"/>'
+        )
 
     # Draw nodes
     for eid, (x, y) in positions.items():
@@ -217,34 +240,39 @@ def generate_svg(center_id: str, entities: dict, relations: list, ring_assignmen
         name = entity.get("properties", {}).get("name", eid)
         color = COLORS.get(e_type, "#888888")
 
+        ring = ring_assignments.get(eid, 4)
+        config = RING_CONFIG[min(ring, len(RING_CONFIG) - 1)]
+        radius = config["node_radius"]
+
         # Highlight center
         stroke_width = 3 if eid == center_id else 1.5
         stroke_color = "#ffffff" if eid == center_id else "#2a2a4e"
-        radius = NODE_RADIUS * 1.3 if eid == center_id else NODE_RADIUS
+        radius = radius * 1.3 if eid == center_id else radius
 
         lines.append(
             f'  <circle cx="{x:.1f}" cy="{y:.1f}" r="{radius}" '
             f'fill="{color}" stroke="{stroke_color}" stroke-width="{stroke_width}"/>'
         )
 
-        # Label
-        display_name = truncate_name(name)
-        lines.append(
-            f'  <text x="{x:.1f}" y="{y + radius + 14:.1f}" '
-            f'text-anchor="middle" fill="#e0e0e0" '
-            f'font-family="system-ui, sans-serif" font-size="{FONT_SIZE}">{display_name}</text>'
-        )
+        # Label — skip for very small outer nodes if crowded
+        if ring <= 3:
+            display_name = truncate_name(name)
+            lines.append(
+                f'  <text x="{x:.1f}" y="{y + radius + 14:.1f}" '
+                f'text-anchor="middle" fill="#e0e0e0" '
+                f'font-family="system-ui, sans-serif" font-size="{FONT_SIZE}"">{display_name}</text>'
+            )
 
-        # Type badge (small, below name)
-        lines.append(
-            f'  <text x="{x:.1f}" y="{y + radius + 26:.1f}" '
-            f'text-anchor="middle" fill="#a0a0a0" '
-            f'font-family="system-ui, sans-serif" font-size="9">{e_type}</text>'
-        )
+            # Type badge (small, below name)
+            lines.append(
+                f'  <text x="{x:.1f}" y="{y + radius + 26:.1f}" '
+                f'text-anchor="middle" fill="#a0a0a0" '
+                f'font-family="system-ui, sans-serif" font-size="9">{e_type}</text>'
+            )
 
     # Legend
     legend_y = SVG_SIZE - 20
-    lines.append(f'  <text x="{SVG_SIZE - 20}" y="{legend_y}" text-anchor="end" fill="#a0a0a0" font-family="system-ui, sans-serif" font-size="10">Generated by Orbit View</text>')
+    lines.append(f'  <text x="{SVG_SIZE - 20}" y="{legend_y}" text-anchor="end" fill="#a0a0a0" font-family="system-ui, sans-serif" font-size="10">Generated by Orbit View — {len(positions)} entities shown</text>')
 
     lines.append('</svg>')
     return '\n'.join(lines)
@@ -254,8 +282,9 @@ def main():
     parser = argparse.ArgumentParser(description="Generate radial SVG visualization of Orbit ontology")
     parser.add_argument("--center", required=True, help="Entity ID to center the visualization on")
     parser.add_argument("--graph", type=Path, default=Path("graph.jsonl"), help="Path to graph.jsonl")
-    parser.add_argument("--output", type=Path, required=True, help="Output SVG file path")
+    parser.add_argument("--output", type=Path, help="Output SVG file path (default: ~/Documents/Orbit-Viz/<entity>_orbit.svg)")
     parser.add_argument("--size", type=int, default=SVG_SIZE, help="SVG canvas size in pixels")
+    parser.add_argument("--show-memory", action="store_true", help="Include MemoryChunk entities in visualization")
     args = parser.parse_args()
 
     # Resolve graph path
@@ -264,7 +293,7 @@ def main():
         graph_path = Path.cwd() / graph_path
 
     print(f"Loading graph from {graph_path}...")
-    entities, relations = load_graph(graph_path)
+    entities, relations = load_graph(graph_path, args.show_memory)
     print(f"Loaded {len(entities)} entities, {len(relations)} relations")
 
     if args.center not in entities:
@@ -280,17 +309,30 @@ def main():
     ring_counts = {}
     for eid, ring in ring_assignments.items():
         ring_counts[ring] = ring_counts.get(ring, 0) + 1
+    total_visible = sum(ring_counts.values())
+    dropped = len(entities) - total_visible
     print("Ring distribution:")
     for i, config in enumerate(RING_CONFIG):
         count = ring_counts.get(i, 0)
+        cap = config["max_nodes"]
         if count > 0:
-            print(f"  Ring {i} ({config['label']}): {count} entities")
+            status = f" (capped at {cap})" if count == cap and i > 0 else ""
+            print(f"  Ring {i} ({config['label']}): {count}/{cap} entities{status}")
+    if dropped > 0:
+        print(f"  Dropped: {dropped} entities (exceeded ring capacity)")
 
     svg = generate_svg(args.center, entities, relations, ring_assignments, positions)
 
+    # Resolve output path
     output_path = args.output
-    if not output_path.is_absolute():
-        output_path = Path.cwd() / output_path
+    if output_path:
+        if not output_path.is_absolute():
+            output_path = Path.cwd() / output_path
+    else:
+        # Default to ~/Documents/Orbit-Viz/
+        DEFAULT_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        safe_name = args.center.replace("_", "-")
+        output_path = DEFAULT_OUTPUT_DIR / f"{safe_name}_orbit.svg"
 
     with open(output_path, "w") as f:
         f.write(svg)
