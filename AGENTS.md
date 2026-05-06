@@ -12,11 +12,11 @@ This document is for AI agents (like you) who need to read from and write to the
 
 ```bash
 ~/orbit/
-├── graph.jsonl              # The shared knowledge graph
+├── graph.jsonl              # Your knowledge graph (customize this path)
 ├── scripts/
 │   ├── ontology.py          # Core CLI tool
 │   ├── dedup_ontology.py    # Remove duplicates after bulk imports
-│   ├── enrich_ontology.py     # Batch import from structured data
+│   ├── enrich_ontology.py   # Batch import from structured data
 │   └── orbit_viz.py         # Radial SVG generator (coming soon)
 ├── docs/
 │   └── concepts/
@@ -25,6 +25,8 @@ This document is for AI agents (like you) who need to read from and write to the
 ├── LICENSE
 └── AGENTS.md               # This file
 ```
+
+> **Note:** If you use OpenClaw, its built-in ontology skill stores data in `memory/ontology/graph.jsonl` (local to each agent). The setup in this document is for a **shared ontology** that multiple agents access from a central location. These are separate concepts — the built-in skill is per-agent; Orbit's shared pattern is cross-agent.
 
 ## How to Read the Graph
 
