@@ -1,103 +1,151 @@
 #!/usr/bin/env python3
 """
-Manual trigger: links current session's memory_search results to the shared ontology.
-Reads the active Kael session transcript, extracts memory snippets, matches them to
-ontology entity names, and writes MemoryChunk + referenced_in ops to the graph.
+Link session memory to your Orbit ontology.
 
-Usage: python3 link_session_to_ontology.py
+Reads a session transcript, extracts memory snippets, matches them to
+ontology entity names, and writes MemoryChunk + referenced_in ops.
+
+Usage:
+    python3 link_session_to_ontology.py --session /path/to/session.jsonl
+    python3 link_session_to_ontology.py --latest  # auto-find latest session
 """
+import argparse
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 
-GRAPH_PATH = Path.home() / ".openclaw/shared-ontology/graph.jsonl"
-SESSION_FILE = Path.home() / ".openclaw/agents/main/sessions/32ae8659-7b66-4143-b2c8-b1a88353f1c8.jsonl"
-MIN_SCORE = 0.4
+def find_latest_session(agent_dir: Path) -> Path:
+    """Find the most recently modified session file."""
+    sessions = sorted(
+        agent_dir.glob("*.jsonl"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True
+    )
+    if not sessions:
+        raise FileNotFoundError(f"No session files in {agent_dir}")
+    return sessions[0]
 
-def load_entities():
+def load_entities(graph_path: Path):
+    """Load all entities from the ontology graph."""
     entities = {}
-    for line in GRAPH_PATH.read_text().strip().split("\n"):
+    if not graph_path.exists():
+        return entities
+    for line in graph_path.read_text().strip().split("\n"):
+        if not line:
+            continue
         try:
             op = json.loads(line)
-            if op["op"] == "create" and "entity" in op:
+            if op.get("op") == "create" and "entity" in op:
                 entities[op["entity"]["id"]] = op["entity"]
-            elif op["op"] == "delete":
-                entities.pop(op.get("id", ""), None)
-        except:
+        except (json.JSONDecodeError, KeyError):
             pass
     return entities
 
-def extract_results():
+def extract_results(session_path: Path, min_score: float = 0.4):
+    """Extract memory_search results from a session transcript."""
     results = []
-    seen = set()
-    for line in SESSION_FILE.read_text().strip().split("\n"):
+    for line in session_path.read_text().strip().split("\n"):
+        if not line:
+            continue
         try:
             msg = json.loads(line)
-            details = msg.get("message", {}).get("details", {})
-            if isinstance(details, dict) and "results" in details:
-                for r in details["results"]:
-                    if isinstance(r, dict) and r.get("score", 0) >= MIN_SCORE and r.get("snippet"):
-                        key = r["snippet"][:100]
-                        if key not in seen:
-                            seen.add(key)
-                            results.append({"snippet": r["snippet"], "score": r["score"]})
-        except:
+            if msg.get("role") != "assistant":
+                continue
+            for part in msg.get("content", []):
+                if part.get("type") == "toolCall" and part.get("name") == "memory_search":
+                    args = json.loads(part.get("arguments", "{}"))
+                    results.append(args.get("query", "unknown"))
+        except (json.JSONDecodeError, KeyError):
             pass
     return results
 
-def find_entities(snippet, entities):
-    lower = snippet.lower()
-    matched = []
-    for eid, entity in entities.items():
-        if entity.get("type") in ("MemoryChunk", "Agent"):
-            continue
-        for field in ["name", "title", "goal"]:
-            val = entity.get("properties", {}).get(field, "").lower()
-            if val and val in lower:
-                matched.append(eid)
+def match_to_entities(queries, entities):
+    """Match query text to entity names by simple substring."""
+    matches = []
+    entity_names = {
+        eid: e.get("properties", {}).get("name", "")
+        for eid, e in entities.items()
+    }
+    for query in queries:
+        query_lower = query.lower()
+        for eid, name in entity_names.items():
+            if name and name.lower() in query_lower:
+                matches.append((query, eid))
                 break
-    return list(set(matched))
+    return matches
 
 def main():
-    if not GRAPH_PATH.exists():
-        print("No shared ontology found at", GRAPH_PATH)
+    parser = argparse.ArgumentParser(description="Link session memory to ontology")
+    parser.add_argument("--graph", type=Path, default=Path("graph.jsonl"),
+                        help="Path to ontology graph (default: ./graph.jsonl)")
+    parser.add_argument("--session", type=Path,
+                        help="Path to specific session transcript")
+    parser.add_argument("--agent-dir", type=Path,
+                        help="Directory containing agent sessions (for --latest)")
+    parser.add_argument("--latest", action="store_true",
+                        help="Use most recent session from agent-dir")
+    parser.add_argument("--min-score", type=float, default=0.4,
+                        help="Minimum relevance score (default: 0.4)")
+    args = parser.parse_args()
+
+    # Resolve graph path
+    graph_path = args.graph
+    if not graph_path.is_absolute():
+        graph_path = Path.cwd() / graph_path
+
+    # Resolve session path
+    if args.latest:
+        if not args.agent_dir:
+            print("Error: --latest requires --agent-dir")
+            return
+        session_path = find_latest_session(args.agent_dir)
+        print(f"Using latest session: {session_path}")
+    elif args.session:
+        session_path = args.session
+    else:
+        print("Error: Provide --session or --latest + --agent-dir")
         return
 
-    entities = load_entities()
-    results = extract_results()
-    print(f"Found {len(results)} unique memory snippets (score >= {MIN_SCORE})")
+    # Load data
+    entities = load_entities(graph_path)
+    print(f"Loaded {len(entities)} entities from {graph_path}")
 
-    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
-    ops = []
-    linked = 0
+    queries = extract_results(session_path, args.min_score)
+    print(f"Extracted {len(queries)} memory queries from {session_path}")
 
-    for i, r in enumerate(results):
-        matched = find_entities(r["snippet"], entities)
-        if not matched:
-            continue
-        chunk_id = f"mc_{ts}_{i}"
-        chunk = {
-            "id": chunk_id,
-            "type": "MemoryChunk",
-            "properties": {
-                "content": r["snippet"][:300].replace("\n", " "),
-                "source": "memory_search_manual",
-                "score": str(round(r["score"], 4)),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        }
-        ops.append(json.dumps({"op": "create", "entity": chunk}))
-        for eid in matched:
-            ops.append(json.dumps({"op": "relate", "from": chunk_id, "rel": "referenced_in", "to": eid}))
-            linked += 1
-            print(f"  {chunk_id} → {eid} (score: {r['score']:.2f})")
+    matches = match_to_entities(queries, entities)
+    print(f"Matched {len(matches)} queries to entities")
 
-    if ops:
-        with open(GRAPH_PATH, "a") as f:
-            f.write("\n".join(ops) + "\n")
-        print(f"\n✅ Linked {linked} connection(s) to ontology")
-    else:
-        print("No entity matches found. Add more entities with: ont create --type Project ...")
+    # Write MemoryChunk ops
+    timestamp = datetime.now(timezone.utc).isoformat()
+    with open(graph_path, "a") as f:
+        for query, eid in matches:
+            chunk_id = f"mc_{timestamp.replace(':', '').replace('-', '')}"
+            chunk = {
+                "op": "create",
+                "entity": {
+                    "id": chunk_id,
+                    "type": "MemoryChunk",
+                    "properties": {
+                        "content": query[:200],
+                        "source": "session_link",
+                        "timestamp": timestamp
+                    }
+                }
+            }
+            rel = {
+                "op": "relate",
+                "from": chunk_id,
+                "rel": "referenced_in",
+                "to": eid
+            }
+            json.dump(chunk, f)
+            f.write("\n")
+            json.dump(rel, f)
+            f.write("\n")
+            print(f"  Linked: {query[:60]}... -> {eid}")
+
+    print(f"\nAppended {len(matches)} MemoryChunks to {graph_path}")
 
 if __name__ == "__main__":
     main()

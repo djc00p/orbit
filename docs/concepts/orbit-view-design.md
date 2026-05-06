@@ -6,13 +6,13 @@ A **centered radial knowledge system** instead of Obsidian's force-directed "hai
 
 ## Core Design
 
-| Ring | Meaning | Example (center = `proj_mypridri`) |
+| Ring | Meaning | Example (center = `proj_website`) |
 |------|---------|-----------------------------------|
-| **Center** | The focused entity | mypridri |
-| **Ring 1** | Direct relationships | `task_merge-pr69`, `proj_mypridri-mcp`, `p_djc` |
-| **Ring 2** | Type siblings | Other Projects (gardening, kraken, etc.) |
-| **Ring 3** | Topic adjacency | `concept_token-economics`, `concept_learning-velocity` |
-| **Ring 4** | Loose connections | `p_eugene-yan` (wrote about topics relevant) |
+| **Center** | The focused entity | proj_website |
+| **Ring 1** | Direct relationships | `task_setup-ci`, `proj_website-api`, `p_alice` |
+| **Ring 2** | Type siblings | Other Projects (mobile app, CLI tool, etc.) |
+| **Ring 3** | Topic adjacency | `concept_learning-velocity`, `concept_api-design` |
+| **Ring 4** | Loose connections | `p_bob` (wrote about topics relevant) |
 
 ## Interaction Model
 
@@ -48,4 +48,4 @@ A **centered radial knowledge system** instead of Obsidian's force-directed "hai
 
 ## Related
 
-[[Orbit View Ontology Viz Concept]], [[SOUL]], [[MEMORY]], [[AGENTS]], [[AGENTS.md]], [[HEARTBEAT.md]]
+[[README]], [[orbit-readme]]

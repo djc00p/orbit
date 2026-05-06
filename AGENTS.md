@@ -6,12 +6,12 @@ This document is for AI agents (like you) who need to read from and write to the
 
 ## Core Principle
 
-**The ontology is the source of truth.** Agents coordinate via shared graph state, not direct messages. When Kael creates a task, Ayo sees it on her next session because it's in `graph.jsonl` — not because Kael messaged her.
+**The ontology is the source of truth.** Agents coordinate via shared graph state, not direct messages. When Alice creates a task, Bob sees it on their next session because it's in `graph.jsonl` — not because Alice messaged them.
 
 ## Directory Structure
 
 ```
-~/.open_source/orbit/
+~/orbit/
 ├── graph.jsonl              # The shared knowledge graph
 ├── scripts/
 │   ├── ontology.py          # Core CLI tool
@@ -72,10 +72,10 @@ When you discover something worth remembering:
 
 ```bash
 ont create --type Learning --id learn_tls-error-20260506 \
-  --props '{"name":"TLS bad record MAC on Ollama","status":"active","goal":"Intermittent TLS errors usually resolve after gateway restart"}'
+  --props '{"name":"TLS handshake failures","status":"active","goal":"Intermittent TLS errors usually resolve after service restart"}'
 
 # Link it to the relevant concept
-ont relate --from learn_tls-error-20260506 --rel relates_to --to concept_ollama
+ont relate --from learn_tls-error-20260506 --rel relates_to --to concept_networking
 ```
 
 ### Adding a Task (Ontology-First Commissioning)
@@ -84,10 +84,10 @@ Instead of messaging another agent, create a task in the graph:
 
 ```bash
 ont create --type Task --id task_research_api \
-  --props '{"name":"Research API rate limits","status":"pending","assignee":"ayo","priority":"high"}'
+  --props '{"name":"Research API rate limits","status":"pending","assignee":"bob","priority":"high"}'
 
 ont relate --from proj_current --rel has_task --to task_research_api
-ont relate --from task_research_api --rel created_by --to agent_kael
+ont relate --from task_research_api --rel created_by --to agent_alice
 ```
 
 The other agent will pick it up on their next session by querying for their tasks.
@@ -107,14 +107,14 @@ Otherwise, use the graph.
 
 | Type | Pattern | Example |
 |------|---------|---------|
-| Project | `proj_<slug>` | `proj_mypridri` |
-| Task | `task_<slug>` | `task_merge-pr69` |
-| Learning | `learn_<slug>-<date>` | `learn_rails-db-prepare` |
-| Skill | `skill_<slug>` | `skill_rails-ci-fixer` |
-| Document | `doc_<slug>` | `doc_gardening-alt-methods` |
-| Person | `p_<slug>` | `p_eugene-yan` |
-| Concept | `concept_<slug>` | `concept_cognitive-surrender` |
-| Agent | `agent_<name>` | `agent_kael` |
+| Project | `proj_<slug>` | `proj_website` |
+| Task | `task_<slug>` | `task_setup-ci` |
+| Learning | `learn_<slug>-<date>` | `learn_cors-preflight-20260506` |
+| Skill | `skill_<slug>` | `skill_api-design` |
+| Document | `doc_<slug>` | `doc_scaling-strategies` |
+| Person | `p_<slug>` | `p_ada-lovelace` |
+| Concept | `concept_<slug>` | `concept_cognitive-load` |
+| Agent | `agent_<name>` | `agent_alice` |
 
 ### Dates in IDs
 
@@ -166,14 +166,14 @@ Optional fields:
    ```
 
 3. **Use CWD detection in scripts**
-   Scripts that check `$HOME/.openclaw/workspace` as fallback will hit the wrong workspace for the other agent. Use `SCRIPT_DIR` + `CWD` pattern matching:
+   Scripts that check hardcoded paths may hit the wrong workspace for other agents. Use `SCRIPT_DIR` + `CWD` pattern matching to determine the active workspace dynamically:
    ```python
    import os
    CWD = os.getcwd()
-   if '/workspace-ayo' in CWD:
-       WORKSPACE = os.path.expanduser("~/.openclaw/workspace-ayo")
+   if '/workspace-bob' in CWD:
+       WORKSPACE = os.path.expanduser("~/workspace-bob")
    else:
-       WORKSPACE = os.path.expanduser("~/.openclaw/workspace")
+       WORKSPACE = os.path.expanduser("~/workspace-alice")
    ```
 
 4. **Never call ontology.py directly without --graph**

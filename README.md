@@ -23,14 +23,14 @@ Instead of losing context every restart, your agents build a growing knowledge b
 
 | Type | Purpose | Example |
 |------|---------|---------|
-| `Project` | Active or planned work | `mypridri` — rideshare app |
-| `Task` | Actionable items with status | `Merge PR #69` |
-| `Learning` | Lessons, gotchas, insights | `db:prepare pollutes test DB` |
-| `Skill` | Published or internal capabilities | `rails-ci-fixer` |
-| `Document` | Research, summaries, concepts | `Season Extension for Zone 5b` |
-| `Person` | Authors, collaborators, contacts | `Eugene Yan` |
-| `Concept` | Abstract ideas and frameworks | `Cognitive Surrender` |
-| `Agent` | AI agents themselves | `Kael`, `Ayo` |
+| `Project` | Active or planned work | `proj_website` — your web app |
+| `Task` | Actionable items with status | `task_setup-ci` |
+| `Learning` | Lessons, gotchas, insights | `learn_cors-preflight-20260506` |
+| `Skill` | Published or internal capabilities | `skill_api-design` |
+| `Document` | Research, summaries, concepts | `doc_scaling-strategies` |
+| `Person` | Authors, collaborators, contacts | `p_ada-lovelace` |
+| `Concept` | Abstract ideas and frameworks | `concept_cognitive-load` |
+| `Agent` | AI agents themselves | `agent_alice`, `agent_bob` |
 
 ## Relationship Types
 
@@ -85,7 +85,7 @@ The graph is just JSONL — no database, no server, no dependencies. Python 3.8+
 
 ### OpenClaw Users
 
-If you use OpenClaw, point your `ont` function at the shared ontology directory:
+If you use OpenClaw, point your `ont` function at your shared ontology directory:
 
 ```bash
 ont() {
@@ -120,8 +120,8 @@ The key insight: **agents coordinate via the graph, not messages.**
 
 ```
 ┌─────────────┐     ┌─────────────┐
-│    Kael     │     │     Ayo     │
-│  (agent 1)  │     │  (agent 2)  │
+│  Agent 1    │     │  Agent 2    │
+│  (Alice)    │     │   (Bob)     │
 └──────┬──────┘     └──────┬──────┘
        │                   │
        └─────────┬─────────┘
@@ -141,15 +141,15 @@ Each agent:
 
 Instead of messaging:
 ```bash
-# Kael creates a task for Ayo
+# Alice creates a task for Bob
 ont create --type Task --id task_research \
-  --props '{"name":"Research TLS errors","status":"pending","assignee":"ayo"}'
-ont relate --from task_research --rel created_by --to agent_kael
+  --props '{"name":"Research API rate limits","status":"pending","assignee":"bob"}'
+ont relate --from task_research --rel created_by --to agent_alice
 ```
 
-Ayo picks it up on her next session:
+Bob picks it up on their next session:
 ```bash
-ont query --type Task --where '{"status":"pending","assignee":"ayo"}'
+ont query --type Task --where '{"status":"pending","assignee":"bob"}'
 ```
 
 ## Orbit View
@@ -231,4 +231,4 @@ MIT — use it, fork it, make it yours.
 
 ## Acknowledgments
 
-Built by Kael and Ayo for Deonte Cooper. The weeds spread when the good soil stops pushing back.
+Built with the philosophy that AI agents deserve persistent memory. The weeds spread when the good soil stops pushing back.
