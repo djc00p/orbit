@@ -11,6 +11,7 @@ Persist entities, relationships, and learnings across sessions. Two agents, one 
 AI agents wake up fresh every session. Orbit is their **long-term memory** — a structured, versionable, shareable graph that agents and humans can both query and update.
 
 Instead of losing context every restart, your agents build a growing knowledge base:
+
 - Projects they're working on
 - Tasks with status
 - Learnings from mistakes
@@ -68,6 +69,50 @@ ont relate --from proj_myapp --rel has_task --to task_setup-ci
 ont relate --from p_you --rel owns --to proj_myapp
 ```
 
+## Setting Up the `ont` Command
+
+The examples use `ont` as a shorthand. It's just a shell function that calls `scripts/ontology.py` with the right `--graph` path.
+
+### Option A: Shell function (recommended)
+
+Add to your `.bashrc`, `.zshrc`, or `.bash_profile`:
+
+```bash
+ont() {
+  local graph="${ORBIT_GRAPH:-graph.jsonl}"
+  python3 /path/to/orbit/scripts/ontology.py "$@" --graph "$graph"
+}
+```
+
+Then reload:
+```bash
+source ~/.bashrc   # or ~/.zshrc
+```
+
+### Option B: Alias with fixed path
+
+```bash
+alias ont='python3 /path/to/orbit/scripts/ontology.py --graph graph.jsonl'
+```
+
+### Option C: Run directly (no setup)
+
+Skip `ont` and call the script directly:
+
+```bash
+python3 scripts/ontology.py create --type Project --id proj_demo \
+  --props '{"name":"Demo","status":"active"}' --graph graph.jsonl
+```
+
+### Custom graph location
+
+Set `ORBIT_GRAPH` to use a graph outside the repo directory:
+
+```bash
+export ORBIT_GRAPH="$HOME/projects/my-project/graph.jsonl"
+ont list
+```
+
 ### 4. Visualize (coming soon)
 
 ```bash
@@ -97,7 +142,7 @@ ont() {
 ## Tools
 
 | Script | Purpose |
-|--------|---------|
+| ------ | ------- |
 | `scripts/ontology.py` | Core CLI: create, query, relate, list, validate |
 | `scripts/dedup_ontology.py` | Remove duplicates after bulk imports |
 | `scripts/enrich_ontology.py` | Batch-import from structured data |
@@ -118,7 +163,7 @@ ont() {
 
 The key insight: **agents coordinate via the graph, not messages.**
 
-```
+```text
 ┌─────────────┐     ┌─────────────┐
 │  Agent 1    │     │  Agent 2    │
 │  (Alice)    │     │   (Bob)     │
@@ -133,6 +178,7 @@ The key insight: **agents coordinate via the graph, not messages.**
 ```
 
 Each agent:
+
 1. Reads the graph on startup
 2. Enriches it from their own perspective
 3. Deduplication merges overlaps
@@ -140,6 +186,7 @@ Each agent:
 ### Ontology-First Communication
 
 Instead of messaging:
+
 ```bash
 # Alice creates a task for Bob
 ont create --type Task --id task_research \
@@ -148,6 +195,7 @@ ont relate --from task_research --rel created_by --to agent_alice
 ```
 
 Bob picks it up on their next session:
+
 ```bash
 ont query --type Task --where '{"status":"pending","assignee":"bob"}'
 ```

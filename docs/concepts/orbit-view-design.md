@@ -7,7 +7,7 @@ A **centered radial knowledge system** instead of Obsidian's force-directed "hai
 ## Core Design
 
 | Ring | Meaning | Example (center = `proj_website`) |
-|------|---------|-----------------------------------|
+| ---- | ------- | --------------------------------- |
 | **Center** | The focused entity | proj_website |
 | **Ring 1** | Direct relationships | `task_setup-ci`, `proj_website-api`, `p_alice` |
 | **Ring 2** | Type siblings | Other Projects (mobile app, CLI tool, etc.) |
@@ -30,7 +30,7 @@ A **centered radial knowledge system** instead of Obsidian's force-directed "hai
 ## Color Palette
 
 | Type | Color |
-|------|-------|
+| ---- | ----- |
 | Project | `#FF6B35` (warm orange — active, alive) |
 | Task | `#4ECDC4` (teal — actionable) |
 | Learning | `#45B7D1` (sky blue — wisdom) |

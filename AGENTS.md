@@ -45,7 +45,16 @@ ont query --type Learning --limit 20
 
 ### Using the `ont` Command
 
-The `ont` function is defined in your shell config. It runs `ontology.py` from the shared-ontology directory:
+`ont` is a shell helper that wraps `scripts/ontology.py` so you don't have to type `--graph` every time. Define it in your shell config:
+
+```bash
+ont() {
+  local graph="${ORBIT_GRAPH:-graph.jsonl}"
+  python3 /path/to/orbit/scripts/ontology.py "$@" --graph "$graph"
+}
+```
+
+Available commands:
 
 ```bash
 ont create --type Project --id proj_example --props '{...}'
